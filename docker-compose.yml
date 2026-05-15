@@ -1,0 +1,122 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: shopnow
+      POSTGRES_PASSWORD: shopnow
+      POSTGRES_DB: shopnow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - shopnow_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shopnow -d shopnow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - shopnow_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth_service:
+    build:
+      context: ./auth_service
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://shopnow:shopnow@postgres:5432/shopnow
+      JWT_SECRET: shopnow-dev-secret
+      PORT: 3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - shopnow_network
+
+  product_service:
+    build:
+      context: ./product_service
+    ports:
+      - "3002:3002"
+    environment:
+      DATABASE_URL: postgresql://shopnow:shopnow@postgres:5432/shopnow
+      AUTH_SERVICE_URL: http://auth_service:3001
+      PORT: 3002
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+    networks:
+      - shopnow_network
+
+  cart_service:
+    build:
+      context: ./cart_service
+    ports:
+      - "3003:3003"
+    environment:
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth_service:3001
+      PORT: 3003
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+    networks:
+      - shopnow_network
+
+  order_service:
+    build:
+      context: ./order_service
+    ports:
+      - "3004:3004"
+    environment:
+      DATABASE_URL: postgresql://shopnow:shopnow@postgres:5432/shopnow
+      AUTH_SERVICE_URL: http://auth_service:3001
+      CART_SERVICE_URL: http://cart_service:3003
+      PORT: 3004
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      cart_service:
+        condition: service_started
+    networks:
+      - shopnow_network
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - auth_service
+      - product_service
+      - cart_service
+      - order_service
+    networks:
+      - shopnow_network
+
+networks:
+  shopnow_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  uploads_data:
