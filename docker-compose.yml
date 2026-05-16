@@ -51,15 +51,13 @@ services:
       - "3002:3002"
     environment:
       DATABASE_URL: postgresql://shopnow:shopnow@postgres:5432/shopnow
-      AUTH_SERVICE_URL: http://auth_service:3001
+      JWT_SECRET: shopnow-dev-secret
       PORT: 3002
     volumes:
       - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
-      auth_service:
-        condition: service_started
     networks:
       - shopnow_network
 
@@ -70,13 +68,11 @@ services:
       - "3003:3003"
     environment:
       REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://auth_service:3001
+      JWT_SECRET: shopnow-dev-secret
       PORT: 3003
     depends_on:
       redis:
         condition: service_healthy
-      auth_service:
-        condition: service_started
     networks:
       - shopnow_network
 
@@ -87,14 +83,12 @@ services:
       - "3004:3004"
     environment:
       DATABASE_URL: postgresql://shopnow:shopnow@postgres:5432/shopnow
-      AUTH_SERVICE_URL: http://auth_service:3001
+      JWT_SECRET: shopnow-dev-secret
       CART_SERVICE_URL: http://cart_service:3003
       PORT: 3004
     depends_on:
       postgres:
         condition: service_healthy
-      auth_service:
-        condition: service_started
       cart_service:
         condition: service_started
     networks:
