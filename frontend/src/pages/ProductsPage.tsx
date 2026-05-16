@@ -23,6 +23,7 @@ export default function ProductsPage({ products, token, userId, isAdmin, onProdu
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -34,23 +35,30 @@ export default function ProductsPage({ products, token, userId, isAdmin, onProdu
 
   function resetForm() {
     setName(''); setPrice(''); setStock('');
-    setImageFile(null); setImagePreview('');
+    setImageFile(null); setImagePreview(''); setFormError('');
     setShowForm(false);
   }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!imageFile) return;
-    setLoading(true);
+    setLoading(true); setFormError('');
     try {
       const p = await api.addProduct(token, { name, price: parseFloat(price), stock: parseInt(stock), image: imageFile });
       if (p.id) { onProductsUpdate([...products, p]); resetForm(); }
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Upload failed');
     } finally { setLoading(false); }
+  }
+
+  async function handleDelete(productId: number) {
+    await api.deleteProduct(token, productId);
+    onProductsUpdate(products.filter((p) => p.id !== productId));
   }
 
   async function handleAddToCart(product: Product) {
     if (!token) { onAuthOpen(); return; }
-    const updated = await api.addToCart(token, userId, { productId: String(product.id), name: product.name, price: product.price, quantity: 1 });
+    const updated = await api.addToCart(token, userId, { productId: String(product.id), name: product.name, price: product.price, quantity: 1, image_url: product.image_url });
     onCartUpdate(updated);
     onCartOpen();
   }
@@ -114,6 +122,7 @@ export default function ProductsPage({ products, token, userId, isAdmin, onProdu
                   <input type="number" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="Stock qty" required min="0"
                     className="px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-800 text-black dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white focus:border-black dark:focus:border-white transition-colors" />
                 </div>
+                {formError && <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-3 py-2 rounded-lg">{formError}</p>}
                 <div className="flex gap-2">
                   <button type="submit" disabled={loading || !imageFile}
                     className="px-5 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors disabled:opacity-40">
@@ -147,7 +156,7 @@ export default function ProductsPage({ products, token, userId, isAdmin, onProdu
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {products.map((p) => (
-            <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} isLoggedIn={!!token} />
+            <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} onDelete={handleDelete} isLoggedIn={!!token} isAdmin={isAdmin} />
           ))}
         </div>
       )}
