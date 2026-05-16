@@ -1,4 +1,4 @@
-import { X, Trash2, ArrowRight, ShoppingCart } from 'lucide-react';
+import { X, Trash2, ArrowRight, ShoppingCart, ImageOff } from 'lucide-react';
 import type { Cart, CartItem } from '../types';
 import * as api from '../lib/api';
 
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function CartSheet({ cart, token, userId, onClose, onCartUpdate, onCheckout }: Props) {
-  const total = cart.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const total = cart.items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
   const count = cart.items.reduce((sum, i) => sum + i.quantity, 0);
 
   async function handleRemove(productId: string) {
@@ -45,15 +45,17 @@ export default function CartSheet({ cart, token, userId, onClose, onCartUpdate, 
             <div className="space-y-1">
               {cart.items.map((item: CartItem) => (
                 <div key={item.productId} className="flex items-center gap-3 group py-3 border-b border-gray-50 dark:border-zinc-800 last:border-0">
-                  <img
-                    src={`https://picsum.photos/seed/${item.productId}/64/64`}
-                    alt={item.name}
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-gray-100 dark:bg-zinc-800"
-                  />
+                  {item.image_url ? (
+                    <img src={item.image_url} alt={item.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-gray-100 dark:bg-zinc-800" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg flex-shrink-0 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center">
+                      <ImageOff className="h-4 w-4 text-gray-300 dark:text-zinc-600" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-black dark:text-white truncate">{item.name}</p>
-                    <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">${item.price.toFixed(2)} × {item.quantity}</p>
-                    <p className="text-sm font-semibold text-black dark:text-white">${(item.price * item.quantity).toFixed(2)}</p>
+                    <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">${Number(item.price).toFixed(2)} × {item.quantity}</p>
+                    <p className="text-sm font-semibold text-black dark:text-white">${(Number(item.price) * item.quantity).toFixed(2)}</p>
                   </div>
                   <button
                     onClick={() => handleRemove(item.productId)}
