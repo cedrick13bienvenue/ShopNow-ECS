@@ -6,14 +6,15 @@ import CartSheet from './components/CartSheet';
 import ProductsPage from './pages/ProductsPage';
 import OrdersPage from './pages/OrdersPage';
 import * as api from './lib/api';
+import { getSecure, setSecure, removeSecure } from './lib/storage';
 
 type View = 'products' | 'orders';
 
 export default function App() {
-  const [token, setToken] = useState(localStorage.getItem('token') || '');
-  const [userId, setUserId] = useState(localStorage.getItem('userId') || '');
-  const [username, setUsername] = useState(localStorage.getItem('username') || '');
-  const [role, setRole] = useState(localStorage.getItem('role') || 'user');
+  const [token, setToken] = useState(getSecure('token'));
+  const [userId, setUserId] = useState(getSecure('userId'));
+  const [username, setUsername] = useState(getSecure('username'));
+  const [role, setRole] = useState(getSecure('role') || 'user');
 
   const [view, setView] = useState<View>('products');
   const [authOpen, setAuthOpen] = useState(false);
@@ -31,26 +32,30 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return;
+    try {
+      const { exp } = JSON.parse(atob(token.split('.')[1])) as { exp: number };
+      if (exp * 1000 < Date.now()) { handleLogout(); return; }
+    } catch { handleLogout(); return; }
     api.getProducts(token).then(setProducts);
     api.getCart(token, userId).then(setCart);
   }, [token, userId]);
 
   function handleAuthSuccess(newToken: string, newUserId: string, newUsername: string, newRole: string) {
     setToken(newToken); setUserId(newUserId); setUsername(newUsername); setRole(newRole);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('userId', newUserId);
-    localStorage.setItem('username', newUsername);
-    localStorage.setItem('role', newRole);
+    setSecure('token', newToken);
+    setSecure('userId', newUserId);
+    setSecure('username', newUsername);
+    setSecure('role', newRole);
     setAuthOpen(false);
   }
 
   function handleLogout() {
     setToken(''); setUserId(''); setUsername(''); setRole('user');
     setCart({ items: [] }); setOrders([]); setProducts([]);
-    localStorage.removeItem('token');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('username');
-    localStorage.removeItem('role');
+    removeSecure('token');
+    removeSecure('userId');
+    removeSecure('username');
+    removeSecure('role');
   }
 
   async function handleCheckout() {
