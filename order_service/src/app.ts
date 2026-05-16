@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { pool } from './db';
 
@@ -6,15 +7,15 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3004;
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth_service:3001';
+const JWT_SECRET = process.env.JWT_SECRET || 'shopnow-dev-secret';
 const CART_SERVICE_URL = process.env.CART_SERVICE_URL || 'http://cart_service:3003';
 
-async function verifyToken(token: string): Promise<{ valid: boolean; user?: { userId: number; username: string } }> {
+type JwtPayload = { userId: number; username: string; role: string };
+
+function verifyToken(token: string): { valid: boolean; user?: JwtPayload } {
   try {
-    const res = await axios.get(`${AUTH_SERVICE_URL}/api/auth/verify`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return res.data;
+    const user = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    return { valid: true, user };
   } catch {
     return { valid: false };
   }
@@ -28,10 +29,9 @@ app.post('/api/orders', async (req: Request, res: Response) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { valid, user } = await verifyToken(token);
+  const { valid, user } = verifyToken(token);
   if (!valid || !user) return res.status(401).json({ error: 'Unauthorized' });
 
-  // Cross-cluster call to Cart Service (Cluster 2 → Cluster 3 pattern)
   const cartRes = await axios.get(`${CART_SERVICE_URL}/api/cart/${user.userId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -42,7 +42,7 @@ app.post('/api/orders', async (req: Request, res: Response) => {
   }
 
   const total = cart.items.reduce(
-    (sum: number, item: { price: number; quantity: number }) => sum + item.price * item.quantity,
+    (sum: number, item: { price: number; quantity: number }) => sum + Number(item.price) * item.quantity,
     0
   );
 
@@ -50,6 +50,11 @@ app.post('/api/orders', async (req: Request, res: Response) => {
     'INSERT INTO orders (user_id, items, total) VALUES ($1, $2, $3) RETURNING *',
     [user.userId, JSON.stringify(cart.items), total]
   );
+
+  await axios.delete(`${CART_SERVICE_URL}/api/cart/${user.userId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => {});
+
   res.status(201).json(result.rows[0]);
 });
 
@@ -57,7 +62,7 @@ app.get('/api/orders/:userId', async (req: Request, res: Response) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { valid } = await verifyToken(token);
+  const { valid } = verifyToken(token);
   if (!valid) return res.status(401).json({ error: 'Unauthorized' });
 
   const result = await pool.query(
@@ -65,6 +70,21 @@ app.get('/api/orders/:userId', async (req: Request, res: Response) => {
     [req.params.userId]
   );
   res.json(result.rows);
+});
+
+app.delete('/api/orders/:orderId', async (req: Request, res: Response) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { valid, user } = verifyToken(token);
+  if (!valid || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+  const result = await pool.query(
+    'DELETE FROM orders WHERE id = $1 AND user_id = $2 RETURNING id',
+    [req.params.orderId, user.userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
+  res.json({ success: true });
 });
 
 app.listen(PORT, () => console.log(`Order service running on port ${PORT}`));
