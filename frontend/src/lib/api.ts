@@ -20,12 +20,22 @@ export async function addProduct(token: string, body: { name: string; price: num
   form.append('stock', String(body.stock));
   form.append('image', body.image);
   const res = await fetch('/api/products', { method: 'POST', headers: hdrs(token), body: form });
+  if (res.status === 413) throw new Error('Image is too large (max 15 MB)');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+    throw new Error(err.error || 'Upload failed');
+  }
   return res.json();
 }
 
 export async function getCart(token: string, userId: string): Promise<Cart> {
-  const res = await fetch(`/api/cart/${userId}`, { headers: hdrs(token) });
-  return res.json();
+  try {
+    const res = await fetch(`/api/cart/${userId}`, { headers: hdrs(token) });
+    const data = await res.json();
+    return Array.isArray(data.items) ? data : { items: [] };
+  } catch {
+    return { items: [] };
+  }
 }
 
 export async function addToCart(token: string, userId: string, item: CartItem): Promise<Cart> {
@@ -38,13 +48,27 @@ export async function removeFromCart(token: string, userId: string, productId: s
   return res.json();
 }
 
+export async function deleteProduct(token: string, productId: number): Promise<void> {
+  await fetch(`/api/products/${productId}`, { method: 'DELETE', headers: hdrs(token) });
+}
+
 export async function createOrder(token: string): Promise<Order> {
   const res = await fetch('/api/orders', { method: 'POST', headers: hdrs(token, true) });
   return res.json();
 }
 
+export async function deleteOrder(token: string, orderId: number): Promise<void> {
+  await fetch(`/api/orders/${orderId}`, { method: 'DELETE', headers: hdrs(token) });
+}
+
 export async function getOrders(token: string, userId: string): Promise<Order[]> {
-  const res = await fetch(`/api/orders/${userId}`, { headers: hdrs(token) });
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  if (!userId) return [];
+  try {
+    const res = await fetch(`/api/orders/${userId}`, { headers: hdrs(token) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
 }
