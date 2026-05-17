@@ -2,22 +2,13 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION      = 'eu-west-1'
-        AWS_ACCOUNT_ID  = credentials('aws-account-id')
-        ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        IMAGE_TAG       = "${env.BUILD_NUMBER}"
-
-        // ECR repository names
-        AUTH_REPO       = "${ECR_REGISTRY}/shopnow/auth-service"
-        PRODUCT_REPO    = "${ECR_REGISTRY}/shopnow/product-service"
-        CART_REPO       = "${ECR_REGISTRY}/shopnow/cart-service"
-        ORDER_REPO      = "${ECR_REGISTRY}/shopnow/order-service"
-        FRONTEND_REPO   = "${ECR_REGISTRY}/shopnow/frontend"
+        AWS_REGION       = 'eu-west-1'
+        IMAGE_TAG        = "${env.BUILD_NUMBER}"
 
         // ECS cluster names
-        AUTH_CLUSTER    = 'shopnow-auth-cluster'
+        AUTH_CLUSTER     = 'shopnow-auth-cluster'
         PRODUCTS_CLUSTER = 'shopnow-products-cluster'
-        CORE_CLUSTER    = 'shopnow-core-cluster'
+        CORE_CLUSTER     = 'shopnow-core-cluster'
     }
 
     stages {
@@ -32,42 +23,42 @@ pipeline {
         }
 
         // ─────────────────────────────────────────
-        // STAGE 2 — build all 5 Docker images at the
-        // same time (parallel = faster)
+        // STAGE 2 — build all 5 Docker images in
+        // parallel (faster than one by one)
         // ─────────────────────────────────────────
         stage('Build Images') {
             parallel {
                 stage('auth-service') {
                     steps {
-                        sh "docker build -t ${AUTH_REPO}:${IMAGE_TAG} ./auth_service"
+                        sh "docker build -t shopnow/auth-service:${IMAGE_TAG} ./auth_service"
                     }
                 }
                 stage('product-service') {
                     steps {
-                        sh "docker build -t ${PRODUCT_REPO}:${IMAGE_TAG} ./product_service"
+                        sh "docker build -t shopnow/product-service:${IMAGE_TAG} ./product_service"
                     }
                 }
                 stage('cart-service') {
                     steps {
-                        sh "docker build -t ${CART_REPO}:${IMAGE_TAG} ./cart_service"
+                        sh "docker build -t shopnow/cart-service:${IMAGE_TAG} ./cart_service"
                     }
                 }
                 stage('order-service') {
                     steps {
-                        sh "docker build -t ${ORDER_REPO}:${IMAGE_TAG} ./order_service"
+                        sh "docker build -t shopnow/order-service:${IMAGE_TAG} ./order_service"
                     }
                 }
                 stage('frontend') {
                     steps {
-                        sh "docker build -t ${FRONTEND_REPO}:${IMAGE_TAG} ./frontend"
+                        sh "docker build -t shopnow/frontend:${IMAGE_TAG} ./frontend"
                     }
                 }
             }
         }
 
         // ─────────────────────────────────────────
-        // STAGE 3 — log Docker into AWS ECR so it can
-        // push images to our private repositories
+        // STAGE 3 — log Docker into AWS ECR so it
+        // can push images to our private repositories
         // ─────────────────────────────────────────
         stage('Login to ECR') {
             steps {
@@ -75,6 +66,13 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-credentials'
                 ]]) {
+                    script {
+                        def accountId = sh(
+                            script: "aws sts get-caller-identity --query Account --output text",
+                            returnStdout: true
+                        ).trim()
+                        env.ECR_REGISTRY = "${accountId}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+                    }
                     sh """
                         aws ecr get-login-password --region ${AWS_REGION} \
                         | docker login --username AWS --password-stdin ${ECR_REGISTRY}
@@ -84,54 +82,58 @@ pipeline {
         }
 
         // ─────────────────────────────────────────
-        // STAGE 4 — push all 5 images to ECR in parallel
-        // also tag as :latest so ECS always has a
-        // stable pointer alongside the build number tag
+        // STAGE 4 — tag images with ECR registry
+        // path and push in parallel
         // ─────────────────────────────────────────
         stage('Push to ECR') {
             parallel {
                 stage('Push auth-service') {
                     steps {
                         sh """
-                            docker tag  ${AUTH_REPO}:${IMAGE_TAG} ${AUTH_REPO}:latest
-                            docker push ${AUTH_REPO}:${IMAGE_TAG}
-                            docker push ${AUTH_REPO}:latest
+                            docker tag  shopnow/auth-service:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/auth-service:${IMAGE_TAG}
+                            docker tag  shopnow/auth-service:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/auth-service:latest
+                            docker push ${ECR_REGISTRY}/shopnow/auth-service:${IMAGE_TAG}
+                            docker push ${ECR_REGISTRY}/shopnow/auth-service:latest
                         """
                     }
                 }
                 stage('Push product-service') {
                     steps {
                         sh """
-                            docker tag  ${PRODUCT_REPO}:${IMAGE_TAG} ${PRODUCT_REPO}:latest
-                            docker push ${PRODUCT_REPO}:${IMAGE_TAG}
-                            docker push ${PRODUCT_REPO}:latest
+                            docker tag  shopnow/product-service:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/product-service:${IMAGE_TAG}
+                            docker tag  shopnow/product-service:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/product-service:latest
+                            docker push ${ECR_REGISTRY}/shopnow/product-service:${IMAGE_TAG}
+                            docker push ${ECR_REGISTRY}/shopnow/product-service:latest
                         """
                     }
                 }
                 stage('Push cart-service') {
                     steps {
                         sh """
-                            docker tag  ${CART_REPO}:${IMAGE_TAG} ${CART_REPO}:latest
-                            docker push ${CART_REPO}:${IMAGE_TAG}
-                            docker push ${CART_REPO}:latest
+                            docker tag  shopnow/cart-service:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/cart-service:${IMAGE_TAG}
+                            docker tag  shopnow/cart-service:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/cart-service:latest
+                            docker push ${ECR_REGISTRY}/shopnow/cart-service:${IMAGE_TAG}
+                            docker push ${ECR_REGISTRY}/shopnow/cart-service:latest
                         """
                     }
                 }
                 stage('Push order-service') {
                     steps {
                         sh """
-                            docker tag  ${ORDER_REPO}:${IMAGE_TAG} ${ORDER_REPO}:latest
-                            docker push ${ORDER_REPO}:${IMAGE_TAG}
-                            docker push ${ORDER_REPO}:latest
+                            docker tag  shopnow/order-service:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/order-service:${IMAGE_TAG}
+                            docker tag  shopnow/order-service:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/order-service:latest
+                            docker push ${ECR_REGISTRY}/shopnow/order-service:${IMAGE_TAG}
+                            docker push ${ECR_REGISTRY}/shopnow/order-service:latest
                         """
                     }
                 }
                 stage('Push frontend') {
                     steps {
                         sh """
-                            docker tag  ${FRONTEND_REPO}:${IMAGE_TAG} ${FRONTEND_REPO}:latest
-                            docker push ${FRONTEND_REPO}:${IMAGE_TAG}
-                            docker push ${FRONTEND_REPO}:latest
+                            docker tag  shopnow/frontend:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/frontend:${IMAGE_TAG}
+                            docker tag  shopnow/frontend:${IMAGE_TAG} ${ECR_REGISTRY}/shopnow/frontend:latest
+                            docker push ${ECR_REGISTRY}/shopnow/frontend:${IMAGE_TAG}
+                            docker push ${ECR_REGISTRY}/shopnow/frontend:latest
                         """
                     }
                 }
@@ -139,9 +141,8 @@ pipeline {
         }
 
         // ─────────────────────────────────────────
-        // STAGE 5 — tell each ECS service to pull the
-        // new image and do a rolling deploy
-        // (old task stays up until new one is healthy)
+        // STAGE 5 — tell each ECS service to pull
+        // the new image and do a rolling deploy
         // ─────────────────────────────────────────
         stage('Deploy to ECS') {
             steps {
@@ -185,8 +186,8 @@ pipeline {
         }
 
         // ─────────────────────────────────────────
-        // STAGE 6 — wait until all ECS services finish
-        // deploying before marking the build green
+        // STAGE 6 — wait until all ECS services
+        // finish deploying before marking build green
         // ─────────────────────────────────────────
         stage('Verify Deployment') {
             steps {
@@ -216,8 +217,8 @@ pipeline {
     }
 
     // ─────────────────────────────────────────
-    // POST — runs after all stages regardless of
-    // success or failure
+    // POST — runs after all stages regardless
+    // of success or failure
     // ─────────────────────────────────────────
     post {
         success {
@@ -227,13 +228,12 @@ pipeline {
             echo "Build #${env.BUILD_NUMBER} failed. Check the logs above."
         }
         always {
-            // clean up local images to free disk space on the Jenkins server
             sh """
-                docker rmi ${AUTH_REPO}:${IMAGE_TAG}     || true
-                docker rmi ${PRODUCT_REPO}:${IMAGE_TAG}  || true
-                docker rmi ${CART_REPO}:${IMAGE_TAG}     || true
-                docker rmi ${ORDER_REPO}:${IMAGE_TAG}    || true
-                docker rmi ${FRONTEND_REPO}:${IMAGE_TAG} || true
+                docker rmi shopnow/auth-service:${IMAGE_TAG}     || true
+                docker rmi shopnow/product-service:${IMAGE_TAG}  || true
+                docker rmi shopnow/cart-service:${IMAGE_TAG}     || true
+                docker rmi shopnow/order-service:${IMAGE_TAG}    || true
+                docker rmi shopnow/frontend:${IMAGE_TAG}         || true
             """
         }
     }
