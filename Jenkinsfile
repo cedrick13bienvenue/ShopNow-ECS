@@ -3,9 +3,6 @@ pipeline {
 
     environment {
         AWS_REGION       = 'eu-west-1'
-        IMAGE_TAG        = "${env.BUILD_NUMBER}"
-
-        // ECS cluster names
         AUTH_CLUSTER     = 'shopnow-auth-cluster'
         PRODUCTS_CLUSTER = 'shopnow-products-cluster'
         CORE_CLUSTER     = 'shopnow-core-cluster'
@@ -13,19 +10,21 @@ pipeline {
 
     stages {
 
-        // ─────────────────────────────────────────
-        // STAGE 1 — pull the latest code from GitHub
-        // ─────────────────────────────────────────
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // ─────────────────────────────────────────
-        // STAGE 2 — build all 5 Docker images in
-        // parallel (faster than one by one)
-        // ─────────────────────────────────────────
+        stage('Set Image Tag') {
+            steps {
+                script {
+                    env.IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    echo "Image tag: ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
         stage('Build Images') {
             parallel {
                 stage('auth-service') {
@@ -56,10 +55,6 @@ pipeline {
             }
         }
 
-        // ─────────────────────────────────────────
-        // STAGE 3 — log Docker into AWS ECR so it
-        // can push images to our private repositories
-        // ─────────────────────────────────────────
         stage('Login to ECR') {
             steps {
                 withCredentials([[
@@ -81,10 +76,6 @@ pipeline {
             }
         }
 
-        // ─────────────────────────────────────────
-        // STAGE 4 — tag images with ECR registry
-        // path and push in parallel
-        // ─────────────────────────────────────────
         stage('Push to ECR') {
             parallel {
                 stage('Push auth-service') {
@@ -140,55 +131,65 @@ pipeline {
             }
         }
 
-        // ─────────────────────────────────────────
-        // STAGE 5 — tell each ECS service to pull
-        // the new image and do a rolling deploy
-        // ─────────────────────────────────────────
         stage('Deploy to ECS') {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-credentials'
                 ]]) {
-                    sh """
-                        aws ecs update-service \
-                            --region ${AWS_REGION} \
-                            --cluster ${AUTH_CLUSTER} \
-                            --service auth-service \
-                            --force-new-deployment
+                    script {
+                        def services = [
+                            [name: 'auth-service',    cluster: AUTH_CLUSTER,     taskFamily: 'auth-service'],
+                            [name: 'product-service', cluster: PRODUCTS_CLUSTER, taskFamily: 'product-service'],
+                            [name: 'cart-service',    cluster: CORE_CLUSTER,     taskFamily: 'cart-service'],
+                            [name: 'order-service',   cluster: CORE_CLUSTER,     taskFamily: 'order-service'],
+                            [name: 'frontend',        cluster: CORE_CLUSTER,     taskFamily: 'frontend'],
+                        ]
 
-                        aws ecs update-service \
-                            --region ${AWS_REGION} \
-                            --cluster ${PRODUCTS_CLUSTER} \
-                            --service product-service \
-                            --force-new-deployment
+                        services.each { svc ->
+                            def image = "${ECR_REGISTRY}/shopnow/${svc.name}:${IMAGE_TAG}"
 
-                        aws ecs update-service \
-                            --region ${AWS_REGION} \
-                            --cluster ${CORE_CLUSTER} \
-                            --service cart-service \
-                            --force-new-deployment
+                            def rendered = sh(
+                                script: """
+                                    aws ecs describe-task-definition \
+                                        --region ${AWS_REGION} \
+                                        --task-definition ${svc.taskFamily} \
+                                        --query 'taskDefinition' \
+                                        --output json \
+                                    | jq 'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)' \
+                                    | jq '(.containerDefinitions[] | select(.name == "${svc.name}") | .image) = "${image}"'
+                                """,
+                                returnStdout: true
+                            ).trim()
 
-                        aws ecs update-service \
-                            --region ${AWS_REGION} \
-                            --cluster ${CORE_CLUSTER} \
-                            --service order-service \
-                            --force-new-deployment
+                            writeFile file: "rendered-${svc.name}.json", text: rendered
 
-                        aws ecs update-service \
-                            --region ${AWS_REGION} \
-                            --cluster ${CORE_CLUSTER} \
-                            --service frontend \
-                            --force-new-deployment
-                    """
+                            def newArn = sh(
+                                script: """
+                                    aws ecs register-task-definition \
+                                        --region ${AWS_REGION} \
+                                        --cli-input-json file://rendered-${svc.name}.json \
+                                        --query 'taskDefinition.taskDefinitionArn' \
+                                        --output text
+                                """,
+                                returnStdout: true
+                            ).trim()
+
+                            sh """
+                                aws ecs update-service \
+                                    --region ${AWS_REGION} \
+                                    --cluster ${svc.cluster} \
+                                    --service ${svc.name} \
+                                    --task-definition ${newArn}
+                            """
+
+                            echo "${svc.name} → ${newArn}"
+                        }
+                    }
                 }
             }
         }
 
-        // ─────────────────────────────────────────
-        // STAGE 6 — wait until all ECS services
-        // finish deploying before marking build green
-        // ─────────────────────────────────────────
         stage('Verify Deployment') {
             steps {
                 withCredentials([[
@@ -216,16 +217,12 @@ pipeline {
         }
     }
 
-    // ─────────────────────────────────────────
-    // POST — runs after all stages regardless
-    // of success or failure
-    // ─────────────────────────────────────────
     post {
         success {
-            echo "Build #${env.BUILD_NUMBER} deployed successfully."
+            echo "Commit ${env.IMAGE_TAG} deployed successfully."
         }
         failure {
-            echo "Build #${env.BUILD_NUMBER} failed. Check the logs above."
+            echo "Deployment of ${env.IMAGE_TAG} failed. Check the logs above."
         }
         always {
             sh """
@@ -235,6 +232,7 @@ pipeline {
                 docker rmi shopnow/order-service:${IMAGE_TAG}    || true
                 docker rmi shopnow/frontend:${IMAGE_TAG}         || true
             """
+            sh "rm -f rendered-*.json"
         }
     }
 }
