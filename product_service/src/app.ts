@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
+import multerS3 from 'multer-s3';
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import path from 'path';
 import fs from 'fs';
 import { pool } from './db';
@@ -10,28 +12,53 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3002;
 const JWT_SECRET = process.env.JWT_SECRET || 'shopnow-dev-secret';
+const S3_BUCKET = process.env.S3_BUCKET || '';
+const AWS_REGION = process.env.AWS_REGION || 'eu-west-1';
+const CLOUDFRONT_DOMAIN = process.env.CLOUDFRONT_DOMAIN || '';
+
+interface S3File extends Express.Multer.File {
+  key: string;
+}
 
 const uploadsDir = '/app/uploads';
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+let s3: S3Client | null = null;
+let upload: multer.Multer;
 
-const storage = multer.diskStorage({
-  destination: uploadsDir,
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Only image files are allowed'));
-  },
-});
-
-app.use('/uploads', express.static(uploadsDir));
+if (S3_BUCKET) {
+  s3 = new S3Client({ region: AWS_REGION });
+  upload = multer({
+    storage: multerS3({
+      s3,
+      bucket: S3_BUCKET,
+      key: (_req: Request, file: Express.Multer.File, cb: (err: Error | null, key: string) => void) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+      },
+    }),
+    limits: { fileSize: 15 * 1024 * 1024 },
+    fileFilter: (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+      if (file.mimetype.startsWith('image/')) cb(null, true);
+      else cb(new Error('Only image files are allowed'));
+    },
+  });
+} else {
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  app.use('/uploads', express.static(uploadsDir));
+  upload = multer({
+    storage: multer.diskStorage({
+      destination: uploadsDir,
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+      },
+    }),
+    limits: { fileSize: 15 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) cb(null, true);
+      else cb(new Error('Only image files are allowed'));
+    },
+  });
+}
 
 type JwtPayload = { userId: number; username: string; role: string };
 
@@ -73,8 +100,17 @@ app.post('/api/products', upload.single('image'), async (req: Request, res: Resp
   if (user?.role !== 'admin') return res.status(403).json({ error: 'Admins only' });
   if (!req.file) return res.status(400).json({ error: 'Image is required' });
 
+  let image_url: string;
+  if (S3_BUCKET) {
+    const key = (req.file as S3File).key;
+    image_url = CLOUDFRONT_DOMAIN
+      ? `https://${CLOUDFRONT_DOMAIN}/${key}`
+      : `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`;
+  } else {
+    image_url = `/uploads/${req.file.filename}`;
+  }
+
   const { name, price, stock } = req.body;
-  const image_url = `/uploads/${req.file.filename}`;
   const result = await pool.query(
     'INSERT INTO products (name, price, stock, image_url) VALUES ($1, $2, $3, $4) RETURNING *',
     [name, price, stock, image_url]
@@ -94,8 +130,15 @@ app.delete('/api/products/:id', async (req: Request, res: Response) => {
 
   const imageUrl: string | null = result.rows[0].image_url;
   if (imageUrl) {
-    const filePath = path.join(uploadsDir, path.basename(imageUrl));
-    fs.unlink(filePath, () => {});
+    if (S3_BUCKET && s3) {
+      try {
+        const key = new URL(imageUrl).pathname.slice(1);
+        await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+      } catch {}
+    } else {
+      const filePath = path.join(uploadsDir, path.basename(imageUrl));
+      fs.unlink(filePath, () => {});
+    }
   }
 
   res.json({ success: true });
