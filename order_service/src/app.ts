@@ -1,14 +1,14 @@
 import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
-import { pool } from './db';
+import { pool, initDb } from './db';
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3004;
 const JWT_SECRET = process.env.JWT_SECRET || 'shopnow-dev-secret';
-const CART_SERVICE_URL = process.env.CART_SERVICE_URL || 'http://cart_service:3003';
+const CART_SERVICE_URL = process.env.CART_SERVICE_URL || 'http://cart-service:3003';
 
 type JwtPayload = { userId: number; username: string; role: string };
 
@@ -87,4 +87,6 @@ app.delete('/api/orders/:orderId', async (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-app.listen(PORT, () => console.log(`Order service running on port ${PORT}`));
+initDb()
+  .then(() => app.listen(PORT, () => console.log(`Order service running on port ${PORT}`)))
+  .catch((err) => { console.error('DB init failed:', err); process.exit(1); });

@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { pool } from './db';
+import { pool, initDb } from './db';
 
 const app = express();
 app.use(express.json());
@@ -50,4 +50,6 @@ app.get('/api/auth/verify', (req: Request, res: Response) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Auth service running on port ${PORT}`));
+initDb()
+  .then(() => app.listen(PORT, () => console.log(`Auth service running on port ${PORT}`)))
+  .catch((err) => { console.error('DB init failed:', err); process.exit(1); });

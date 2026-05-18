@@ -5,7 +5,7 @@ import multerS3 from 'multer-s3';
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import path from 'path';
 import fs from 'fs';
-import { pool } from './db';
+import { pool, initDb } from './db';
 
 const app = express();
 app.use(express.json());
@@ -148,4 +148,6 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-app.listen(PORT, () => console.log(`Product service running on port ${PORT}`));
+initDb()
+  .then(() => app.listen(PORT, () => console.log(`Product service running on port ${PORT}`)))
+  .catch((err) => { console.error('DB init failed:', err); process.exit(1); });
