@@ -8,7 +8,8 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3004;
 const JWT_SECRET = process.env.JWT_SECRET || 'shopnow-dev-secret';
-const CART_SERVICE_URL = process.env.CART_SERVICE_URL || 'http://cart-service:3003';
+const CART_SERVICE_URL    = process.env.CART_SERVICE_URL    || 'http://cart-service:3003';
+const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://product-service:3002';
 
 type JwtPayload = { userId: number; username: string; role: string };
 
@@ -54,6 +55,15 @@ app.post('/api/orders', async (req: Request, res: Response) => {
   await axios.delete(`${CART_SERVICE_URL}/api/cart/${user.userId}`, {
     headers: { Authorization: `Bearer ${token}` },
   }).catch(() => {});
+
+  await Promise.all(
+    cart.items.map((item: { productId: string; quantity: number }) =>
+      axios.patch(`${PRODUCT_SERVICE_URL}/api/products/${item.productId}/stock`,
+        { decrement: item.quantity },
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).catch(() => {})
+    )
+  );
 
   res.status(201).json(result.rows[0]);
 });

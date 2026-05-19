@@ -144,6 +144,21 @@ app.delete('/api/products/:id', async (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+app.patch('/api/products/:id/stock', async (req: Request, res: Response) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const { valid } = verifyToken(token);
+  if (!valid) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { decrement } = req.body;
+  const result = await pool.query(
+    'UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2 RETURNING id, stock',
+    [decrement, req.params.id]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+  res.json(result.rows[0]);
+});
+
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
