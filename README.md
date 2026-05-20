@@ -33,3 +33,15 @@ AWS (eu-west-1)
           ├── ElastiCache Redis 7  (cart sessions, 1 h TTL)
           └── Service Connect namespace  shopnow.local
 ```
+
+---
+
+## Services
+
+| Service | Port | Storage | Responsibility |
+|---|---|---|---|
+| `auth-service` | 3001 | RDS `shopnow_auth` | Register, login, issue JWT |
+| `product-service` | 3002 | RDS `shopnow_products` + S3 | Product catalog, image uploads |
+| `cart-service` | 3003 | ElastiCache Redis | Per-user cart (1 h TTL) |
+| `order-service` | 3004 | RDS `shopnow_orders` | Checkout, clear cart, update stock |
+| `frontend` | 80 | — | React SPA + nginx reverse proxy |
