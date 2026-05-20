@@ -173,3 +173,13 @@ Image tag = git commit SHA → rollback = deploy a previous task-definition revi
 | `order-service` | `DB_NAME` | `shopnow_orders` |
 | `order-service` | `CART_SERVICE_URL` | `http://cart-service.shopnow.local:3003` |
 | `order-service` | `PRODUCT_SERVICE_URL` | `http://product-service.shopnow.local:3002` |
+
+---
+
+## Running Locally
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost → login with `admin / admin123`.
