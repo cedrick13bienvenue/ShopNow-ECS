@@ -134,3 +134,13 @@ CloudFront OAC policy restricts S3 access to CloudFront only.
 ```
 
 Image tag = git commit SHA → rollback = deploy a previous task-definition revision.
+
+---
+
+## IAM
+
+| Principal | Policy | Purpose |
+|---|---|---|
+| `ecsTaskExecutionRole` | `AmazonECSTaskExecutionRolePolicy` + `CloudWatchLogsFullAccess` | ECS pulls ECR images, writes logs |
+| `shopnow-product-task-role` | `AmazonS3FullAccess` | product-service uploads/deletes S3 objects |
+| `shopnow-jenkins` (IAM user) | `AmazonEC2ContainerRegistryFullAccess` + `AmazonECS_FullAccess` | Jenkins pipeline |
