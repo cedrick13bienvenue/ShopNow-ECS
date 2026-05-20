@@ -45,3 +45,27 @@ AWS (eu-west-1)
 | `cart-service` | 3003 | ElastiCache Redis | Per-user cart (1 h TTL) |
 | `order-service` | 3004 | RDS `shopnow_orders` | Checkout, clear cart, update stock |
 | `frontend` | 80 | — | React SPA + nginx reverse proxy |
+
+---
+
+## AWS Resources
+
+| Resource | Name / Value | Purpose |
+|---|---|---|
+| VPC | `shopnow-vpc`  `10.0.0.0/16` | Network boundary |
+| Public Subnets | `shopnow-public-subnet` / `-b` | ALB + NAT |
+| Private Subnets | `shopnow-private-subnet` / `-b` | ECS tasks, RDS, Redis |
+| Internet Gateway | `shopnow-igw` | VPC → internet |
+| NAT Gateway | `shopnow-nat` | Private subnets → internet |
+| ALB | `shopnow-alb` | Port 80 → frontend |
+| ECR | `shopnow/*` (5 repos) | Docker image registry |
+| ECS Clusters | 3 (auth, products, core) | Fargate task hosting |
+| RDS PostgreSQL 18 | `shopnow-db` | 3 app databases |
+| ElastiCache Redis 7 | `shopnow-redis` | Cart sessions |
+| S3 | `shopnow-product-images-*` | Product image storage |
+| CloudFront | — | CDN in front of S3 |
+| Cloud Map | `shopnow.local` | Service Connect namespace |
+| IAM Role | `ecsTaskExecutionRole` | ECR pull + CloudWatch logs |
+| IAM Role | `shopnow-product-task-role` | S3 access from product-service |
+| IAM User | `shopnow-jenkins` | Jenkins ECR push + ECS deploy |
+| CloudWatch | `/ecs/*` (5 log groups) | Container logs, 7-day retention |
