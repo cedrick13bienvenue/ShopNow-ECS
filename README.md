@@ -81,3 +81,16 @@ AWS (eu-west-1)
 | `shopnow-backend-sg` | TCP 3001–3004 from `10.0.0.0/16` |
 | `shopnow-rds-sg` | TCP 5432 from `shopnow-backend-sg` |
 | `shopnow-redis-sg` | TCP 6379 from `shopnow-backend-sg` |
+
+---
+
+## ECS Clusters & ECR
+
+| Cluster | Service(s) | Service Connect mode |
+|---|---|---|
+| `shopnow-auth-cluster` | `auth-service` | Client and server |
+| `shopnow-products-cluster` | `product-service` | Client and server |
+| `shopnow-core-cluster` | `cart-service`, `order-service`, `frontend` | Client and server / Client only (frontend) |
+
+All clusters use **Fargate** with the `shopnow.local` Service Connect namespace.
+Task definitions live in `task-definitions/` and are seeded on first registration.
