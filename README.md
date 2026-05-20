@@ -144,3 +144,32 @@ Image tag = git commit SHA → rollback = deploy a previous task-definition revi
 | `ecsTaskExecutionRole` | `AmazonECSTaskExecutionRolePolicy` + `CloudWatchLogsFullAccess` | ECS pulls ECR images, writes logs |
 | `shopnow-product-task-role` | `AmazonS3FullAccess` | product-service uploads/deletes S3 objects |
 | `shopnow-jenkins` (IAM user) | `AmazonEC2ContainerRegistryFullAccess` + `AmazonECS_FullAccess` | Jenkins pipeline |
+
+---
+
+## Environment Variables
+
+### Shared (all backend services)
+
+| Variable | Value |
+|---|---|
+| `DB_HOST` | RDS endpoint |
+| `DB_PORT` | `5432` |
+| `DB_USER` | `shopnow_user` |
+| `DB_PASSWORD` | your RDS password |
+| `JWT_SECRET` | shared secret |
+
+### Per-service extras
+
+| Service | Variable | Value |
+|---|---|---|
+| `auth-service` | `DB_NAME` | `shopnow_auth` |
+| `product-service` | `DB_NAME` | `shopnow_products` |
+| `product-service` | `S3_BUCKET` | your bucket name |
+| `product-service` | `CLOUDFRONT_DOMAIN` | CloudFront domain |
+| `product-service` | `AWS_REGION` | `eu-west-1` |
+| `cart-service` | `REDIS_HOST` | ElastiCache primary endpoint |
+| `cart-service` | `REDIS_PORT` | `6379` |
+| `order-service` | `DB_NAME` | `shopnow_orders` |
+| `order-service` | `CART_SERVICE_URL` | `http://cart-service.shopnow.local:3003` |
+| `order-service` | `PRODUCT_SERVICE_URL` | `http://product-service.shopnow.local:3002` |
