@@ -202,3 +202,22 @@ Open http://localhost → login with `admin / admin123`.
 12. **ECS Services** — 5 services with Service Connect + correct security groups
 13. **ALB** — target group (IP, port 80) → ALB → attach to frontend service
 14. **Jenkins** — configure AWS credentials + GitHub token → trigger build
+
+---
+
+## Pause & Resume
+
+**To pause** (saves ~$2/day):
+
+1. ECS → each service → Update → desired tasks = `0`
+2. RDS → `shopnow-db` → Stop temporarily
+3. ElastiCache → `shopnow-redis` → Delete
+4. NAT Gateway → Delete → release Elastic IP
+
+**To resume**:
+
+1. RDS → Start → wait Available
+2. Recreate ElastiCache (step 8 above)
+3. Allocate Elastic IP → recreate NAT → update private route table
+4. ECS → each service → desired tasks = `1`
+5. Jenkins → Build Now
