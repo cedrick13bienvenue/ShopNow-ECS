@@ -18,10 +18,10 @@
         }
       ],
       "environment": [
-        { "name": "NODE_ENV",       "value": "production" },
-        { "name": "REDIS_HOST",     "value": "REPLACE_REDIS_HOST" },
-        { "name": "REDIS_PORT",     "value": "6379" },
-        { "name": "JWT_SECRET",     "value": "REPLACE_JWT_SECRET" }
+        { "name": "NODE_ENV",   "value": "production" },
+        { "name": "REDIS_HOST", "value": "REPLACE_REDIS_HOST" },
+        { "name": "REDIS_PORT", "value": "6379" },
+        { "name": "JWT_SECRET", "value": "REPLACE_JWT_SECRET" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
@@ -33,8 +33,5 @@
       },
       "essential": true
     }
-  ],
-  "serviceConnectConfiguration": {
-    "enabled": false
-  }
+  ]
 }

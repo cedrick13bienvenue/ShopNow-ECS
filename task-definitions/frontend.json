@@ -30,8 +30,5 @@
       },
       "essential": true
     }
-  ],
-  "serviceConnectConfiguration": {
-    "enabled": false
-  }
+  ]
 }
