@@ -69,3 +69,15 @@ AWS (eu-west-1)
 | IAM Role | `shopnow-product-task-role` | S3 access from product-service |
 | IAM User | `shopnow-jenkins` | Jenkins ECR push + ECS deploy |
 | CloudWatch | `/ecs/*` (5 log groups) | Container logs, 7-day retention |
+
+---
+
+## Networking & Security Groups
+
+| Security Group | Allows |
+|---|---|
+| `shopnow-alb-sg` | TCP 80 from `0.0.0.0/0` |
+| `shopnow-frontend-sg` | TCP 80 from `shopnow-alb-sg` |
+| `shopnow-backend-sg` | TCP 3001–3004 from `10.0.0.0/16` |
+| `shopnow-rds-sg` | TCP 5432 from `shopnow-backend-sg` |
+| `shopnow-redis-sg` | TCP 6379 from `shopnow-backend-sg` |
