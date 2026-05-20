@@ -114,3 +114,23 @@ Cart items stored per user ID with 1-hour TTL.
 
 **S3 + CloudFront** — images streamed directly from product-service via `multer-s3`.
 CloudFront OAC policy restricts S3 access to CloudFront only.
+
+---
+
+## CI/CD Pipeline
+
+```
+1. Checkout          git pull
+2. Set Image Tag     git rev-parse --short HEAD  (e.g. a3f9d2c)
+3. Build Images      docker build × 5  (parallel)
+4. Login ECR         aws ecr get-login-password | docker login
+5. Push to ECR       docker push :SHA + :latest × 5  (parallel)
+6. Deploy ECS        per service:
+                       describe-task-definition  (read live def from AWS)
+                       jq                        (strip read-only fields, inject new image)
+                       register-task-definition  (new revision)
+                       update-service            (pin to new revision ARN)
+7. Verify            aws ecs wait services-stable × 3 clusters
+```
+
+Image tag = git commit SHA → rollback = deploy a previous task-definition revision.
