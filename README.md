@@ -183,3 +183,22 @@ docker compose up --build
 ```
 
 Open http://localhost → login with `admin / admin123`.
+
+---
+
+## AWS Provisioning Order
+
+1. **IAM** — `ecsTaskExecutionRole`, `shopnow-product-task-role`, `shopnow-jenkins` user + access key
+2. **ECR** — 5 repositories under `shopnow/`
+3. **S3 + CloudFront** — bucket, OAC, distribution
+4. **VPC** — VPC, 4 subnets, IGW, public route table
+5. **NAT Gateway** — Elastic IP → NAT → private route table
+6. **Security Groups** — 5 groups (alb, frontend, backend, rds, redis)
+7. **RDS** — subnet group → PostgreSQL 18 instance
+8. **ElastiCache** — subnet group → Redis 7 cluster
+9. **Cloud Map** — `shopnow.local` namespace (DNS + API, attached to VPC)
+10. **ECS Clusters** — 3 clusters with Service Connect enabled
+11. **Task Definitions** — paste JSON from `task-definitions/`, fill in endpoints + secrets
+12. **ECS Services** — 5 services with Service Connect + correct security groups
+13. **ALB** — target group (IP, port 80) → ALB → attach to frontend service
+14. **Jenkins** — configure AWS credentials + GitHub token → trigger build
