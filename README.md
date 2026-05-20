@@ -94,3 +94,23 @@ AWS (eu-west-1)
 
 All clusters use **Fargate** with the `shopnow.local` Service Connect namespace.
 Task definitions live in `task-definitions/` and are seeded on first registration.
+
+---
+
+## Data Layer
+
+**RDS PostgreSQL 18** — `shopnow-db` (private, no public access, SSL required)
+
+| Database | Owner service |
+|---|---|
+| `shopnow_auth` | auth-service |
+| `shopnow_products` | product-service |
+| `shopnow_orders` | order-service |
+
+Each service auto-creates its database on first boot.
+
+**ElastiCache Redis 7** — `shopnow-redis` (`cache.t3.micro`, no replicas)
+Cart items stored per user ID with 1-hour TTL.
+
+**S3 + CloudFront** — images streamed directly from product-service via `multer-s3`.
+CloudFront OAC policy restricts S3 access to CloudFront only.
