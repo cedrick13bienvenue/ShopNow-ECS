@@ -5,7 +5,36 @@ ECS Service Connect handles inter-service communication via the `shopnow.local` 
 
 ---
 
-## Architecture
+## Kubernetes Architecture (Minikube)
+
+```
+YOUR MACHINE
+│
+├── eval $(minikube docker-env)
+│     └── docker build × 5 → images built directly inside Minikube
+│
+└── Minikube  (single-node cluster, Docker driver)
+      │
+      └── Namespace: shopnow
+            │
+            ├── Ingress  shopnow-ingress ◄── http://localhost  (minikube tunnel)
+            │
+            ├── frontend Pod        :80   ──▶ proxies /api/* to backend services
+            ├── auth-service Pod    :3001 ──▶ postgres  shopnow_auth
+            ├── product-service Pod :3002 ──▶ postgres  shopnow_products · PVC (uploads)
+            ├── cart-service Pod    :3003 ──▶ redis
+            ├── order-service Pod   :3004 ──▶ postgres  shopnow_orders
+            ├── postgres Pod        :5432 ──▶ PVC  1Gi
+            └── redis Pod           :6379
+            │
+            ├── ConfigMap  shopnow-config   (ports, hostnames, DB names)
+            ├── Secret     shopnow-secret   (DB password, JWT secret)
+            └── PVC × 2                     (postgres data · product uploads)
+```
+
+---
+
+## ECS Architecture
 
 ```
 YOUR MACHINE
