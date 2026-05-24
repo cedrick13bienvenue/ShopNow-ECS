@@ -5,7 +5,7 @@ const DB_PORT     = parseInt(process.env.DB_PORT || '5432');
 const DB_NAME     = process.env.DB_NAME     || 'shopnow';
 const DB_USER     = process.env.DB_USER     || 'shopnow';
 const DB_PASSWORD = process.env.DB_PASSWORD || 'shopnow';
-const SSL         = DB_HOST !== 'localhost' ? { rejectUnauthorized: false } : false;
+const SSL         = process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false;
 
 async function ensureDatabase() {
   const bootstrap = new Pool({ host: DB_HOST, port: DB_PORT, database: 'postgres', user: DB_USER, password: DB_PASSWORD, ssl: SSL });
