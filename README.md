@@ -34,6 +34,23 @@ YOUR MACHINE
 
 ---
 
+## Kubernetes Resources
+
+| Resource | Name | Count |
+|---|---|---|
+| Namespace | `shopnow` | 1 |
+| Deployment | one per service | 7 |
+| Service (ClusterIP) | postgres, redis, auth, product, cart, order | 6 |
+| Service (NodePort) | `frontend` — port 30080 | 1 |
+| Ingress | `shopnow-ingress` | 1 |
+| ConfigMap | `shopnow-config` | 1 |
+| Secret | `shopnow-secret` | 1 |
+| PersistentVolumeClaim | postgres data + product uploads | 2 |
+
+Manifests live in `k8s/`. Secrets are gitignored — copy `k8s/secret.yaml.example` to `k8s/secret.yaml` and fill in values before deploying.
+
+---
+
 ## ECS Architecture
 
 ```
