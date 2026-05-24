@@ -179,10 +179,9 @@ Image tag = git commit SHA → rollback = deploy a previous task-definition revi
 ## Running Locally
 
 ```bash
+cp .env.example .env   # first time only — fill in DB_PASSWORD and JWT_SECRET
 docker compose up --build
 ```
-
-`.env` is already committed with local defaults — no extra setup needed.
 
 Open http://localhost → login with `admin / admin123`.
 
