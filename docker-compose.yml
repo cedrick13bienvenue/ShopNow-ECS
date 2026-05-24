@@ -94,6 +94,7 @@ services:
     environment:
       DB_NAME: shopnow_orders
       CART_SERVICE_URL: http://cart-service.shopnow.local:3003
+      PRODUCT_SERVICE_URL: http://product-service.shopnow.local:3002
       PORT: "3004"
     depends_on:
       postgres:
