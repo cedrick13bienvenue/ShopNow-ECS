@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopnow-config
+  namespace: shopnow
+data:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: shopnow
+  DB_NAME_AUTH: shopnow_auth
+  DB_NAME_PRODUCTS: shopnow_products
+  DB_NAME_ORDERS: shopnow_orders
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_URL: redis://redis:6379
+  CART_SERVICE_URL: http://cart-service:3003
+  PRODUCT_SERVICE_URL: http://product-service:3002
+  PORT_AUTH: "3001"
+  PORT_PRODUCT: "3002"
+  PORT_CART: "3003"
+  PORT_ORDER: "3004"
