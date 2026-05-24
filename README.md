@@ -224,9 +224,49 @@ Image tag = git commit SHA → rollback = deploy a previous task-definition revi
 
 ## Running Locally
 
+### Docker Compose
+
 ```bash
 cp .env.example .env   # first time only — fill in DB_PASSWORD and JWT_SECRET
 docker compose up --build
+```
+
+Open http://localhost → login with `admin / admin123`.
+
+### Minikube (Kubernetes)
+
+```bash
+# 1 — start cluster
+minikube start --driver=docker
+minikube addons enable ingress
+
+# 2 — build images inside Minikube
+eval $(minikube docker-env)
+docker build -t shopnow/auth-service:latest ./auth_service
+docker build -t shopnow/product-service:latest ./product_service
+docker build -t shopnow/cart-service:latest ./cart_service
+docker build -t shopnow/order-service:latest ./order_service
+docker build -t shopnow/frontend:latest ./frontend
+
+# 3 — create secret (first time only)
+cp k8s/secret.yaml.example k8s/secret.yaml
+# edit k8s/secret.yaml — fill in DB_PASSWORD and JWT_SECRET
+
+# 4 — deploy
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/postgres/
+kubectl apply -f k8s/redis/
+kubectl apply -f k8s/auth-service/
+kubectl apply -f k8s/product-service/
+kubectl apply -f k8s/cart-service/
+kubectl apply -f k8s/order-service/
+kubectl apply -f k8s/frontend/
+kubectl apply -f k8s/ingress.yaml
+
+# 5 — open tunnel (keep this terminal running)
+minikube tunnel
 ```
 
 Open http://localhost → login with `admin / admin123`.
