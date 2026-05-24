@@ -182,6 +182,8 @@ Image tag = git commit SHA → rollback = deploy a previous task-definition revi
 docker compose up --build
 ```
 
+`.env` is already committed with local defaults — no extra setup needed.
+
 Open http://localhost → login with `admin / admin123`.
 
 ---
