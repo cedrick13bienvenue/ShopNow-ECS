@@ -33,12 +33,12 @@ services:
     build:
       context: ./auth_service
     ports:
-      - "${PORT_AUTH}:${PORT_AUTH}"
+      - "3001:3001"
     env_file:
       - ./default.env
     environment:
-      DB_NAME: ${DB_NAME_AUTH}
-      PORT: ${PORT_AUTH}
+      DB_NAME: shopnow_auth
+      PORT: "3001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,12 +51,12 @@ services:
     build:
       context: ./product_service
     ports:
-      - "${PORT_PRODUCT}:${PORT_PRODUCT}"
+      - "3002:3002"
     env_file:
       - ./default.env
     environment:
-      DB_NAME: ${DB_NAME_PRODUCTS}
-      PORT: ${PORT_PRODUCT}
+      DB_NAME: shopnow_products
+      PORT: "3002"
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -71,11 +71,11 @@ services:
     build:
       context: ./cart_service
     ports:
-      - "${PORT_CART}:${PORT_CART}"
+      - "3003:3003"
     env_file:
       - ./default.env
     environment:
-      PORT: ${PORT_CART}
+      PORT: "3003"
     depends_on:
       redis:
         condition: service_healthy
@@ -88,13 +88,13 @@ services:
     build:
       context: ./order_service
     ports:
-      - "${PORT_ORDER}:${PORT_ORDER}"
+      - "3004:3004"
     env_file:
       - ./default.env
     environment:
-      DB_NAME: ${DB_NAME_ORDERS}
-      CART_SERVICE_URL: http://cart-service.shopnow.local:${PORT_CART}
-      PORT: ${PORT_ORDER}
+      DB_NAME: shopnow_orders
+      CART_SERVICE_URL: http://cart-service.shopnow.local:3003
+      PORT: "3004"
     depends_on:
       postgres:
         condition: service_healthy
