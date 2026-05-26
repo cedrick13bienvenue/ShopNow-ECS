@@ -5,4 +5,3 @@ dist/
 .DS_Store
 k8s/secret.yaml
 k8s/storageclass.yaml
-eks/
