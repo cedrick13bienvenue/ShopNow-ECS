@@ -1,7 +1,6 @@
-# ShopNow — Microservices E-Commerce on AWS ECS
+# ShopNow — Microservices E-Commerce
 
-5-service Node.js e-commerce app deployed on AWS ECS Fargate.
-ECS Service Connect handles inter-service communication via the `shopnow.local` namespace.
+5-service Node.js e-commerce app. Runs locally via Docker Compose or Minikube, and on AWS via ECS Fargate or EKS.
 
 ---
 
@@ -48,6 +47,71 @@ YOUR MACHINE
 | PersistentVolumeClaim | postgres data + product uploads | 2 |
 
 Manifests live in `k8s/`. Secrets are gitignored — copy `k8s/secret.yaml.example` to `k8s/secret.yaml` and fill in values before deploying.
+
+---
+
+## Kubernetes Architecture (EKS)
+
+```
+YOUR MACHINE
+│
+└── docker build × 5 → push to Docker Hub → kubectl apply
+
+AWS (eu-west-1)
+│
+└── VPC  10.0.0.0/16
+    └── Public Subnets  (eu-west-1a / eu-west-1b)
+          │
+          └── EKS Cluster  shopnow-eks
+                │
+                ├── Node Group  shopnow-nodes  (2 × t3.medium)
+                │
+                └── Namespace: shopnow
+                      │
+                      ├── NLB ◄── internet :80
+                      │     └── frontend Service (LoadBalancer)
+                      │
+                      ├── frontend Pod        :80   ──▶ proxies /api/* to backend services
+                      ├── auth-service Pod    :3001 ──▶ postgres  shopnow_auth
+                      ├── product-service Pod :3002 ──▶ postgres  shopnow_products
+                      │                               ──▶ S3 (IRSA) ──▶ CloudFront
+                      ├── cart-service Pod    :3003 ──▶ redis
+                      ├── order-service Pod   :3004 ──▶ postgres  shopnow_orders
+                      ├── postgres Pod        :5432 ──▶ EBS  1Gi  (gp3)
+                      └── redis Pod           :6379
+                      │
+                      ├── ConfigMap     shopnow-config
+                      ├── Secret        shopnow-secret
+                      ├── ServiceAccount shopnow-product-sa  (IRSA → S3)
+                      └── PVC × 2       (postgres data · product uploads → EBS)
+```
+
+---
+
+## EKS Resources
+
+| Resource | Name | Purpose |
+|---|---|---|
+| EKS Cluster | `shopnow-eks` | Managed Kubernetes control plane |
+| Node Group | `shopnow-nodes` | 2 × t3.medium worker nodes |
+| OIDC Provider | auto-named | Lets IAM trust tokens issued by the cluster |
+| Addon: vpc-cni | — | Assigns real VPC IPs to pods |
+| Addon: kube-proxy | — | Routes Service traffic between pods |
+| Addon: coredns | — | DNS resolution inside the cluster |
+| Addon: aws-ebs-csi-driver | — | Dynamically creates EBS volumes for PVCs |
+| StorageClass | `shopnow-ebs` | Tells EBS CSI to provision gp3 volumes |
+| NLB | auto-created | Created by AWS when frontend Service type=LoadBalancer |
+| EBS Volumes × 2 | auto-created | Created by EBS CSI when PVCs are bound |
+| IAM Role | `shopnow-eks-cluster-role` | EKS control plane permissions |
+| IAM Role | `shopnow-eks-node-role` | Worker node EC2 permissions |
+| IAM Role | `shopnow-ebs-csi-role` | EBS CSI driver creates/attaches volumes |
+| IAM Role | `shopnow-product-s3-role` | product-service uploads images to S3 (IRSA) |
+| S3 Bucket | `shopnow-product-images-cedrick` | Product image storage |
+| CloudFront | — | CDN in front of S3 |
+
+**IRSA (IAM Roles for Service Accounts)** — instead of giving AWS credentials to pods directly, IRSA lets a Kubernetes ServiceAccount assume an IAM role. The pod gets temporary credentials automatically. Used for both the EBS CSI driver and product-service.
+
+Full deployment guide: [`eks-deployment.md`](eks-deployment.md)
 
 ---
 
