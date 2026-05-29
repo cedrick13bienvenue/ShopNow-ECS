@@ -28,6 +28,8 @@ spec:
                   key: DB_PASSWORD
             - name: POSTGRES_DB
               value: shopnow
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

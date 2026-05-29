@@ -6,6 +6,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: shopnow-ebs
   resources:
     requests:
       storage: 1Gi
