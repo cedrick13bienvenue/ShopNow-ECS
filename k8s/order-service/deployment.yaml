@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: order-service
-          image: shopnow/order-service:latest
-          imagePullPolicy: Never
+          image: cedrick13bienvenue/order-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3004
           env:

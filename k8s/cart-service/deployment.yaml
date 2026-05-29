@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: cart-service
-          image: shopnow/cart-service:latest
-          imagePullPolicy: Never
+          image: cedrick13bienvenue/cart-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3003
           env:

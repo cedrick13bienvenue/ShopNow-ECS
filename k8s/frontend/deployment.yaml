@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: shopnow/frontend:latest
-          imagePullPolicy: Never
+          image: cedrick13bienvenue/frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
