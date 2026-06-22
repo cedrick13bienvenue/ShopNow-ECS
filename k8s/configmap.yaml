@@ -19,3 +19,6 @@ data:
   PORT_PRODUCT: "3002"
   PORT_CART: "3003"
   PORT_ORDER: "3004"
+  S3_BUCKET: ""
+  AWS_REGION: "eu-west-1"
+  CLOUDFRONT_DOMAIN: ""
