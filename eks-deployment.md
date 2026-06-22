@@ -469,6 +469,26 @@ kubectl rollout restart deployment frontend -n shopnow
 
 ---
 
+### nginx upload timeout — ERR_CONNECTION_RESET on POST /api/products
+
+**Symptom:** Product is created (visible in list) but browser shows connection reset after upload.
+
+**Cause:** Large image uploads to S3 take longer than nginx's default proxy timeout.
+
+**Fix:** Already handled in `frontend/nginx.conf` — `proxy_read_timeout 120s` and `proxy_send_timeout 120s` are set for the `/api/products` location. If you see this issue, rebuild and push the frontend image.
+
+---
+
+### Product images not displaying
+
+**Symptom:** Images show as broken after upload.
+
+**Cause:** S3 bucket is private. Direct S3 URLs return 403. CloudFront must be in front of S3.
+
+**Fix:** Ensure `CLOUDFRONT_DOMAIN` is set in `k8s/configmap.yaml` and product-service deployment is restarted after applying the configmap.
+
+---
+
 ## Teardown (to $0)
 
 Always delete Kubernetes resources first — this releases the NLB and EBS volumes. If you delete AWS resources first, the NLB and volumes become orphans and block VPC deletion.
@@ -492,3 +512,161 @@ kubectl delete namespace shopnow
 #                         shopnow-ebs-csi-role, shopnow-product-s3-role
 # IAM → Identity providers → delete OIDC provider
 ```
+
+---
+
+## Terraform-Based Deployment (Recommended)
+
+All the manual steps above are automated via Terraform in the `eks/` folder. Use this approach to provision and tear down repeatably without touching the AWS Console.
+
+### What Terraform Creates
+
+- VPC, 2 public subnets, IGW, route table, security group
+- IAM roles: cluster, node, EBS CSI (IRSA wired automatically), product S3 (IRSA)
+- EKS cluster `shopnow-eks` + OIDC provider
+- Node group: 2x `t3.medium`
+- Addons: vpc-cni, kube-proxy, coredns, ebs-csi-driver
+- S3 bucket for product images (random suffix)
+- CloudFront distribution in front of S3 (OAC + bucket policy)
+
+### Step 1 — Build and Push Docker Images
+
+```bash
+cd /path/to/ShopNow-ECS
+
+docker build -t cedrick13bienvenue/auth-service:latest ./auth_service
+docker build -t cedrick13bienvenue/product-service:latest ./product_service
+docker build -t cedrick13bienvenue/cart-service:latest ./cart_service
+docker build -t cedrick13bienvenue/order-service:latest ./order_service
+docker build -t cedrick13bienvenue/frontend:latest ./frontend
+
+docker push cedrick13bienvenue/auth-service:latest
+docker push cedrick13bienvenue/product-service:latest
+docker push cedrick13bienvenue/cart-service:latest
+docker push cedrick13bienvenue/order-service:latest
+docker push cedrick13bienvenue/frontend:latest
+```
+
+### Step 2 — Terraform Backend (run once only)
+
+```bash
+cd eks/backend
+terraform init
+terraform apply
+```
+
+### Step 3 — Provision Infrastructure
+
+```bash
+cd ..
+terraform init
+terraform apply
+```
+
+⏳ Takes ~15-20 minutes. When complete:
+
+```bash
+terraform output
+```
+
+Note these two values — they change every time you destroy and recreate:
+- `bucket_name`
+- `cloudfront_domain`
+
+### Step 4 — Connect kubectl
+
+```bash
+aws eks update-kubeconfig --region eu-west-1 --name shopnow-eks
+
+kubectl get nodes
+# should show 2 nodes Ready
+
+kubectl get pods -n kube-system | grep ebs
+# both controller pods should show 6/6 Running — handled automatically by Terraform
+```
+
+### Step 5 — Install Nginx Ingress Controller
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml
+
+kubectl get pods -n ingress-nginx -w
+# wait until 1/1 Running
+```
+
+### Step 6 — Update ConfigMap
+
+Open `k8s/configmap.yaml` and set:
+
+```yaml
+S3_BUCKET: "<value from terraform output bucket_name>"
+CLOUDFRONT_DOMAIN: "<value from terraform output cloudfront_domain>"
+```
+
+### Step 7 — Deploy ShopNow
+
+```bash
+cd /path/to/ShopNow-ECS
+
+kubectl apply -f k8s/storageclass.yaml
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/serviceaccount.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/postgres/
+kubectl apply -f k8s/redis/
+kubectl apply -f k8s/auth-service/
+kubectl apply -f k8s/product-service/
+kubectl apply -f k8s/cart-service/
+kubectl apply -f k8s/order-service/
+kubectl apply -f k8s/frontend/
+kubectl apply -f k8s/ingress.yaml
+
+kubectl get pods -n shopnow -w
+# all 7 pods should reach Running
+```
+
+### Step 8 — Access the App
+
+```bash
+kubectl get svc frontend -n shopnow
+# EXTERNAL-IP is the NLB DNS name — open in browser
+# DNS takes 2-3 minutes to propagate
+```
+
+Login with `admin / admin123`.
+
+### Teardown (Terraform)
+
+> ⚠️ Delete Kubernetes resources first to release the NLB and EBS volumes before destroying AWS infrastructure.
+
+```bash
+kubectl delete namespace shopnow
+kubectl delete namespace ingress-nginx
+
+cd eks
+terraform destroy
+```
+
+### Recreate After Teardown
+
+Only two values change after every destroy/recreate — update them in `k8s/configmap.yaml` from `terraform output`:
+
+```yaml
+S3_BUCKET: "<new bucket_name>"
+CLOUDFRONT_DOMAIN: "<new cloudfront_domain>"
+```
+
+Then repeat Steps 4–8. Everything else (cluster name, IAM role names, service names) stays the same.
+
+### Switching Between Local and EKS
+
+```bash
+kubectl config get-contexts
+
+kubectl config use-context minikube                                                    # local
+kubectl config use-context arn:aws:eks:eu-west-1:<account-id>:cluster/shopnow-eks    # EKS
+```
+
+When on **local**: skip `k8s/storageclass.yaml` — minikube has `standard` as default.
+When on **EKS**: apply `k8s/storageclass.yaml` first — registers EBS as the default StorageClass.
