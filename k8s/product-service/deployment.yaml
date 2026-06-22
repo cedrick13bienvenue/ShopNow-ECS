@@ -57,11 +57,20 @@ spec:
                   name: shopnow-secret
                   key: JWT_SECRET
             - name: S3_BUCKET
-              value: "shopnow-product-images-cedrick"
+              valueFrom:
+                configMapKeyRef:
+                  name: shopnow-config
+                  key: S3_BUCKET
             - name: AWS_REGION
-              value: "eu-west-1"
+              valueFrom:
+                configMapKeyRef:
+                  name: shopnow-config
+                  key: AWS_REGION
             - name: CLOUDFRONT_DOMAIN
-              value: "d2zhph5qkh6hqt.cloudfront.net"
+              valueFrom:
+                configMapKeyRef:
+                  name: shopnow-config
+                  key: CLOUDFRONT_DOMAIN
           volumeMounts:
             - name: uploads
               mountPath: /app/uploads
