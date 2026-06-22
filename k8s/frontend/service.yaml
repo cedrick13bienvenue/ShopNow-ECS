@@ -4,7 +4,6 @@ metadata:
   name: frontend
   namespace: shopnow
 spec:
-  type: LoadBalancer
   selector:
     app: frontend
   ports:
