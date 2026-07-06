@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dev-alice-impersonate-shopnow-viewers
+subjects:
+  - kind: User
+    name: dev-alice
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: impersonate-shopnow-viewers
+  apiGroup: rbac.authorization.k8s.io
