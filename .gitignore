@@ -4,3 +4,6 @@ dist/
 *.env.local
 .DS_Store
 k8s/secret.yaml
+rbac-lab/*.key
+rbac-lab/*.csr
+rbac-lab/*.crt
